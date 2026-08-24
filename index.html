@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Safety Monitor</title>
+<style>
+  /* ── Tokens ─────────────────────────────────────────── */
+  :root {
+    --bg:        #0D1117;
+    --surface:   #161B22;
+    --border:    #21262D;
+    --accent:    #00C48C;
+    --accent2:   #0D8A63;
+    --danger:    #F85149;
+    --warning:   #E3B341;
+    --text:      #E6EDF3;
+    --muted:     #7D8590;
+    --radius:    10px;
+    --font:      'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font);
+         min-height: 100vh; }
+
+  /* ── Login ──────────────────────────────────────────── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 60% 40%, #0D2B1F 0%, #0D1117 70%);
+  }
+  .login-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px; width: 100%; max-width: 400px;
+  }
+  .login-logo {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
+  }
+  .login-logo .dot {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center;
+    justify-content: center; font-size: 18px;
+  }
+  .login-logo h1 { font-size: 18px; font-weight: 600; }
+  .login-logo p { font-size: 12px; color: var(--muted); }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; color: var(--muted);
+                      margin-bottom: 6px; }
+  .form-group input {
+    width: 100%; padding: 10px 14px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus { border-color: var(--accent); }
+  .btn {
+    width: 100%; padding: 11px; background: var(--accent);
+    color: #000; border: none; border-radius: var(--radius);
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: var(--accent2); color: #fff; }
+  .error-msg { color: var(--danger); font-size: 13px;
+               margin-top: 12px; text-align: center; }
+
+  /* ── App shell ──────────────────────────────────────── */
+  #app { display: none; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 220px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px 0; display: flex; flex-direction: column;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-logo .dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+  .sidebar-logo span { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted);
+    transition: all 0.15s; border: none; background: none; width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--border); color: var(--text); }
+  .nav-item.active { background: #0D2B1F; color: var(--accent); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer {
+    padding: 16px 12px; border-top: 1px solid var(--border);
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    border-radius: 8px; background: var(--border);
+  }
+  .user-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--accent2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-info .name { font-size: 12px; font-weight: 600;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-info .role { font-size: 11px; color: var(--muted); }
+  .logout-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 16px; padding: 2px;
+  }
+  .logout-btn:hover { color: var(--danger); }
+
+  /* ── Main content ───────────────────────────────────── */
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 28px; }
+  .page-header h2 { font-size: 22px; font-weight: 700; }
+  .page-header p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Stat cards ─────────────────────────────────────── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .stat-card .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .stat-card .value { font-size: 32px; font-weight: 700; }
+  .stat-card.danger .value  { color: var(--danger); }
+  .stat-card.warning .value { color: var(--warning); }
+  .stat-card.success .value { color: var(--accent); }
+
+  /* ── Incidents table ────────────────────────────────── */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .table-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .table-header h3 { font-size: 14px; font-weight: 600; }
+  .refresh-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 10px 16px; text-align: left; font-size: 11px;
+       color: var(--muted); border-bottom: 1px solid var(--border);
+       font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1C2128; }
+  .badge {
+    display: inline-flex; align-items: center; padding: 3px 8px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge.pending  { background: #2D2A1A; color: var(--warning); }
+  .badge.confirmed { background: #1A2D1A; color: var(--accent); }
+  .badge.false_alarm { background: #2D1A1A; color: var(--danger); }
+  .badge.resolved { background: #1A1F2D; color: #7AA2F7; }
+  .badge.critical { background: #2D1A1A; color: var(--danger); }
+  .badge.high     { background: #2D211A; color: #FF9E64; }
+  .badge.medium   { background: #2D2A1A; color: var(--warning); }
+  .badge.low      { background: #1C2128; color: var(--muted); }
+  .action-btn {
+    background: none; border: 1px solid var(--border); color: var(--text);
+    padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .empty-state {
+    padding: 48px; text-align: center; color: var(--muted); font-size: 14px;
+  }
+
+  /* ── Incident detail modal ──────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .modal-header h3 { font-size: 16px; font-weight: 700; }
+  .close-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 20px; line-height: 1;
+  }
+  .close-btn:hover { color: var(--text); }
+  .detail-row {
+    display: flex; gap: 8px; margin-bottom: 10px; font-size: 13px;
+  }
+  .detail-row .key { color: var(--muted); width: 120px; flex-shrink: 0; }
+  .modal-actions { margin-top: 24px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-confirm {
+    padding: 9px 18px; background: var(--accent); color: #000;
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-confirm:hover { background: var(--accent2); color: #fff; }
+  .btn-false {
+    padding: 9px 18px; background: none; color: var(--danger);
+    border: 1px solid var(--danger); border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-false:hover { background: var(--danger); color: #fff; }
+  .btn-alert {
+    padding: 9px 18px; background: none; color: var(--warning);
+    border: 1px solid var(--warning); border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-alert:hover { background: var(--warning); color: #000; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+    border-radius: 8px; font-size: 13px; font-weight: 500; z-index: 200;
+    animation: slideIn 0.2s ease;
+  }
+  .toast.success { background: var(--accent); color: #000; }
+  .toast.error   { background: var(--danger); color: #fff; }
+  @keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* ── Live pulse indicator ───────────────────────────── */
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="dot">🛡</div>
+      <div>
+        <h1>AI Safety Monitor</h1>
+        <p>Secure access only</p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="your@email.com">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn" onclick="doLogin()">Sign in</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────── -->
+<div id="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="dot"></div>
+      <span>AI Safety<br>Monitor</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPage('dashboard')">
+        <span class="icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('incidents')">
+        <span class="icon">⚠️</span> Incidents
+      </button>
+      <button class="nav-item" onclick="showPage('cameras')">
+        <span class="icon">📷</span> Cameras
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="user-info">
+          <div class="name" id="user-name">Admin</div>
+          <div class="role" id="user-role">admin</div>
+        </div>
+        <button class="logout-btn" onclick="doLogout()" title="Sign out">↩</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Dashboard page -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h2><span class="live-dot"></span>Dashboard</h2>
+        <p>Live overview of all monitored locations</p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card danger">
+          <div class="label">Pending Review</div>
+          <div class="value" id="stat-pending">—</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="label">Confirmed</div>
+          <div class="value" id="stat-confirmed">—</div>
+        </div>
+        <div class="stat-card success">
+          <div class="label">Resolved</div>
+          <div class="value" id="stat-resolved">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total Incidents</div>
+          <div class="value" id="stat-total">—</div>
+        </div>
+      </div>
+
+      <!-- Recent incidents -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Recent Incidents</h3>
+          <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+        <div id="recent-incidents-body"></div>
+      </div>
+    </div>
+
+    <!-- Incidents page -->
+    <div class="page" id="page-incidents">
+      <div class="page-header">
+        <h2>All Incidents</h2>
+        <p>Review and action every detected event</p>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Incident Log</h3>
+          <button class="refresh-btn" onclick="loadIncidents()">↻ Refresh</button>
+        </div>
+        <div id="incidents-body"></div>
+      </div>
+    </div>
+
+    <!-- Cameras page -->
+    <div class="page" id="page-cameras">
+      <div class="page-header">
+        <h2>Cameras</h2>
+        <p>Registered monitoring locations</p>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Active Cameras</h3>
+          <button class="refresh-btn" onclick="loadCameras()">↻ Refresh</button>
+        </div>
+        <div id="cameras-body"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── INCIDENT DETAIL MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="incident-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Incident Details</h3>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-content"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+let token = localStorage.getItem('token');
+let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let currentIncident = null;
+
+// ── Auth ──────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  document.getElementById('login-error').textContent = '';
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+    token = data.access_token;
+    currentUser = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    showApp();
+  } catch(e) {
+    document.getElementById('login-error').textContent = e.message;
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  token = null; currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-name').textContent = currentUser.full_name;
+  document.getElementById('user-role').textContent = currentUser.role;
+  document.getElementById('user-avatar').textContent =
+    currentUser.full_name.charAt(0).toUpperCase();
+  loadDashboard();
+}
+
+// ── Navigation ────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'incidents') loadIncidents();
+  if (name === 'cameras')   loadCameras();
+}
+
+// ── API helper ────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`,
+               'Content-Type': 'application/json' }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  if (res.status === 401) { doLogout(); return null; }
+  return res.json();
+}
+
+// ── Dashboard ─────────────────────────────────────────
+async function loadDashboard() {
+  const stats = await api('/dashboard/stats');
+  if (!stats) return;
+  document.getElementById('stat-pending').textContent   = stats.pending_review;
+  document.getElementById('stat-confirmed').textContent = stats.confirmed;
+  document.getElementById('stat-resolved').textContent  = stats.resolved;
+  document.getElementById('stat-total').textContent     = stats.total_incidents;
+
+  const incidents = await api('/incidents?limit=10');
+  document.getElementById('recent-incidents-body').innerHTML =
+    renderIncidentsTable(incidents);
+}
+
+// ── Incidents ─────────────────────────────────────────
+async function loadIncidents() {
+  const incidents = await api('/incidents');
+  document.getElementById('incidents-body').innerHTML =
+    renderIncidentsTable(incidents);
+}
+
+function renderIncidentsTable(incidents) {
+  if (!incidents || incidents.length === 0)
+    return '<div class="empty-state">No incidents recorded yet.</div>';
+
+  const rows = incidents.map(i => `
+    <tr>
+      <td>${formatDate(i.created_at)}</td>
+      <td>${i.incident_type.replace(/_/g,' ')}</td>
+      <td><span class="badge ${i.severity}">${i.severity}</span></td>
+      <td><span class="badge ${i.status}">${i.status.replace(/_/g,' ')}</span></td>
+      <td>${i.location_description || '—'}</td>
+      <td>
+        <button class="action-btn" onclick="openIncident('${i.id}')">
+          Review
+        </button>
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>Type</th><th>Severity</th>
+          <th>Status</th><th>Location</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Incident detail ───────────────────────────────────
+async function openIncident(id) {
+  const inc = await api(`/incidents/${id}`);
+  if (!inc) return;
+  currentIncident = inc;
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="detail-row"><span class="key">Type</span>
+      <span>${inc.incident_type.replace(/_/g,' ')}</span></div>
+    <div class="detail-row"><span class="key">Severity</span>
+      <span class="badge ${inc.severity}">${inc.severity}</span></div>
+    <div class="detail-row"><span class="key">Status</span>
+      <span class="badge ${inc.status}">${inc.status.replace(/_/g,' ')}</span></div>
+    <div class="detail-row"><span class="key">Time</span>
+      <span>${formatDate(inc.created_at)}</span></div>
+    <div class="detail-row"><span class="key">Location</span>
+      <span>${inc.location_description || '—'}</span></div>
+    <div class="detail-row"><span class="key">Notes</span>
+      <span>${inc.notes || '—'}</span></div>
+  `;
+
+  const actions = document.getElementById('modal-actions');
+  if (inc.status === 'pending') {
+    actions.innerHTML = `
+      <button class="btn-confirm" onclick="reviewIncident('confirmed')">
+        ✓ Confirm Incident
+      </button>
+      <button class="btn-false" onclick="reviewIncident('false_alarm')">
+        ✕ False Alarm
+      </button>
+    `;
+  } else if (inc.status === 'confirmed') {
+    actions.innerHTML = `
+      <button class="btn-alert" onclick="sendAlert()">
+        🔔 Send Alert
+      </button>
+      <button class="btn-confirm" onclick="reviewIncident('resolved')">
+        ✓ Mark Resolved
+      </button>
+    `;
+  } else {
+    actions.innerHTML = `<span style="color:var(--muted);font-size:13px">
+      This incident has been ${inc.status.replace(/_/g,' ')}.
+    </span>`;
+  }
+
+  document.getElementById('incident-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('incident-modal').classList.remove('open');
+  currentIncident = null;
+}
+
+async function reviewIncident(status) {
+  if (!currentIncident) return;
+  const res = await api(`/incidents/${currentIncident.id}/review`,
+    'PATCH', { status });
+  if (res) {
+    showToast(`Marked as ${status.replace(/_/g,' ')}`, 'success');
+    closeModal();
+    loadDashboard();
+    loadIncidents();
+  }
+}
+
+async function sendAlert() {
+  if (!currentIncident) return;
+  const recipient = prompt('Enter recipient phone/email:');
+  if (!recipient) return;
+  const res = await api('/alerts/send', 'POST', {
+    incident_id: currentIncident.id,
+    alert_type: 'police',
+    channel: 'sms',
+    recipient,
+    message: `ALERT: ${currentIncident.incident_type} detected at ` +
+             `${currentIncident.location_description || 'unknown location'}.`
+  });
+  if (res) showToast('Alert sent successfully', 'success');
+}
+
+// ── Cameras ───────────────────────────────────────────
+async function loadCameras() {
+  const cameras = await api('/cameras');
+  const body = document.getElementById('cameras-body');
+  if (!cameras || cameras.length === 0) {
+    body.innerHTML = '<div class="empty-state">No cameras registered yet.</div>';
+    return;
+  }
+  const rows = cameras.map(c => `
+    <tr>
+      <td>${c.name}</td>
+      <td>${c.location}</td>
+      <td>${c.latitude || '—'}</td>
+      <td>${c.longitude || '—'}</td>
+      <td><span class="badge ${c.is_active ? 'confirmed' : 'false_alarm'}">
+        ${c.is_active ? 'Active' : 'Offline'}</span></td>
+    </tr>`).join('');
+
+  body.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Name</th><th>Location</th>
+        <th>Latitude</th><th>Longitude</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Helpers ───────────────────────────────────────────
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-PK', { day:'2-digit', month:'short',
+    year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Init ──────────────────────────────────────────────
+if (token && currentUser) {
+  showApp();
+} else {
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(() => {
+  if (document.getElementById('page-dashboard').classList.contains('active')) {
+    loadDashboard();
+  }
+}, 30000);
+</script>
+</body>
+</html>
