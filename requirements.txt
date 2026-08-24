@@ -1,7 +1,7 @@
-fastapi
-uvicorn
-httpx
-bcrypt
-pyjwt
-python-dotenv
-pydantic[email]
+fastapi==0.104.0
+uvicorn==0.24.0
+httpx==0.25.0
+python-dotenv==1.0.0
+bcrypt==4.1.0
+pyjwt==2.8.0
+pydantic[email]==2.5.0
