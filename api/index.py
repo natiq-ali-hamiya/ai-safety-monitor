@@ -480,6 +480,7 @@ async def register(req: RegisterRequest, token: dict = Depends(require_admin)):
         "id": u["id"], "email": u["email"], "role": u["role"]}}
 
 @router.post("/auth/login")
+@router.post("/auth/login/")
 async def login(req: LoginRequest, request: Request):
     clean_email = req.email.strip().lower()
     users = await db_query("users", "GET", filters=f"?email=eq.{clean_email}")
@@ -506,6 +507,7 @@ async def login(req: LoginRequest, request: Request):
     }
 
 @router.get("/auth/me")
+@router.get("/auth/me/")
 async def get_current_user(token: dict = Depends(verify_token)):
     users = await db_query("users", "GET", filters=f"?id=eq.{token['sub']}")
     if not users:
@@ -515,6 +517,7 @@ async def get_current_user(token: dict = Depends(verify_token)):
             "email": u["email"], "role": u["role"]}
 
 @router.post("/incidents")
+@router.post("/incidents/")
 async def report_incident(req: IncidentReport, token: dict = Depends(verify_token)):
     incident = await db_query("incidents", "POST", {
         "camera_id":            req.camera_id,
@@ -529,6 +532,7 @@ async def report_incident(req: IncidentReport, token: dict = Depends(verify_toke
     return {"message": "Incident recorded", "incident": incident[0]}
 
 @router.get("/incidents")
+@router.get("/incidents/")
 async def list_incidents(status: Optional[str] = None, limit: Optional[int] = 50, token: dict = Depends(verify_token)):
     filters = f"?order=created_at.desc&limit={limit}"
     if status:
@@ -556,6 +560,7 @@ async def review_incident(incident_id: str, req: IncidentReview, token: dict = D
     return {"message": f"Incident marked as {req.status}", "incident": updated[0]}
 
 @router.post("/alerts/send")
+@router.post("/alerts/send/")
 async def send_alert(req: AlertRequest, token: dict = Depends(verify_token)):
     incidents = await db_query("incidents", "GET", filters=f"?id=eq.{req.incident_id}")
     if not incidents:
@@ -576,10 +581,12 @@ async def send_alert(req: AlertRequest, token: dict = Depends(verify_token)):
     return {"message": f"Alert sent via {req.channel}", "alert_log": log_entry[0]}
 
 @router.get("/alerts/{incident_id}")
+@router.get("/alerts/{incident_id}/")
 async def get_alert_logs(incident_id: str, token: dict = Depends(verify_token)):
     return await db_query("alert_logs", "GET", filters=f"?incident_id=eq.{incident_id}")
 
 @router.post("/evidence")
+@router.post("/evidence/")
 async def save_evidence(req: EvidenceRecord, token: dict = Depends(verify_token)):
     result = await db_query("evidence", "POST", {
         "incident_id":      req.incident_id,
@@ -591,14 +598,17 @@ async def save_evidence(req: EvidenceRecord, token: dict = Depends(verify_token)
     return {"message": "Evidence saved", "evidence": result[0]}
 
 @router.get("/evidence/{incident_id}")
+@router.get("/evidence/{incident_id}/")
 async def get_evidence(incident_id: str, token: dict = Depends(verify_token)):
     return await db_query("evidence", "GET", filters=f"?incident_id=eq.{incident_id}")
 
 @router.get("/cameras")
+@router.get("/cameras/")
 async def list_cameras(token: dict = Depends(verify_token)):
     return await db_query("cameras", "GET", filters="?is_active=eq.1")
 
 @router.post("/cameras")
+@router.post("/cameras/")
 async def add_camera(camera: dict, token: dict = Depends(require_admin)):
     camera["added_by"] = token["sub"]
     if "name" in camera:
@@ -609,6 +619,7 @@ async def add_camera(camera: dict, token: dict = Depends(require_admin)):
     return {"message": "Camera registered", "camera": result[0]}
 
 @router.get("/dashboard/stats")
+@router.get("/dashboard/stats/")
 async def dashboard_stats(token: dict = Depends(verify_token)):
     all_incidents = await db_query("incidents", "GET")
     pending      = sum(1 for i in all_incidents if i.get("status") == "pending")
@@ -624,6 +635,7 @@ async def dashboard_stats(token: dict = Depends(verify_token)):
     }
 
 @router.post("/demo/simulate-incident")
+@router.post("/demo/simulate-incident/")
 async def simulate_demo_incident(incident_type: Optional[str] = "CHILD_IN_DANGER", token: dict = Depends(verify_token)):
     types = {
         "CHILD_IN_DANGER": ("critical", "Main Gate Playground", ["Child (Age ~4)"]),
