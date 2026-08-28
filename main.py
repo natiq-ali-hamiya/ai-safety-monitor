@@ -34,7 +34,13 @@ SUPABASE_URL     = os.getenv("SUPABASE_URL", "https://lgsvbbzaocprdingtgtc.supab
 SUPABASE_KEY     = os.getenv("SUPABASE_KEY")
 JWT_SECRET       = os.getenv("JWT_SECRET", "super-secret-ai-safety-command-center-jwt-key-2026-production")
 JWT_EXPIRE_HOURS = 24
-SQLITE_DB_PATH   = os.getenv("SQLITE_DB_PATH", str(BASE_DIR / "safety_monitor.db"))
+
+# In serverless environments (Vercel / AWS Lambda), the root filesystem is read-only.
+# We use /tmp which provides writable ephemeral scratch space.
+if os.getenv("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "/tmp/safety_monitor.db")
+else:
+    SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", str(BASE_DIR / "safety_monitor.db"))
 
 USE_SUPABASE = bool(SUPABASE_KEY and SUPABASE_KEY.strip() and not SUPABASE_KEY.startswith("your_"))
 
@@ -478,7 +484,7 @@ class EvidenceRecord(BaseModel):
 async def serve_frontend():
     html_file = BASE_DIR / "index.html"
     if html_file.exists():
-        return FileResponse(str(html_file), media_type="text/html")
+        return HTMLResponse(content=html_file.read_text(encoding="utf-8"), status_code=200)
     return HTMLResponse("<h1>AI Safety Monitoring System API is Running.</h1><p>Visit /api for documentation.</p>")
 
 @app.get("/app", response_class=HTMLResponse)
