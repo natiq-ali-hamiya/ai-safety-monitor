@@ -526,10 +526,11 @@
 </div>
 
 <script>
-// Dynamic API Endpoint (works on localhost, Render, Railway, Vercel)
-const API = (window.location.protocol.startsWith('http')) 
+// Dynamic API Endpoint (routes to /api serverless namespace on Vercel & localhost)
+const API_ORIGIN = (window.location.protocol.startsWith('http')) 
   ? window.location.origin 
   : 'http://127.0.0.1:8000';
+const API = API_ORIGIN + '/api';
 
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
@@ -559,8 +560,16 @@ async function doLogin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+    
+    let data;
+    const textResponse = await res.text();
+    try {
+      data = JSON.parse(textResponse);
+    } catch(err) {
+      throw new Error(`Server returned ${res.status}: ${textResponse.slice(0, 100) || 'Invalid server response'}`);
+    }
+
+    if (!res.ok) throw new Error(data.detail || data.error || 'Authentication failed');
 
     token = data.access_token;
     currentUser = data.user;
@@ -606,6 +615,7 @@ function showPage(name) {
 
 // ── API helper ────────────────────────────────────────
 async function api(path, method='GET', body=null) {
+  const cleanPath = path.startsWith('/api') ? path : `/api${path.startsWith('/') ? '' : '/'}${path}`;
   const opts = {
     method,
     headers: { 
@@ -615,7 +625,7 @@ async function api(path, method='GET', body=null) {
   };
   if (body) opts.body = JSON.stringify(body);
   try {
-    const res = await fetch(API + path, opts);
+    const res = await fetch(API_ORIGIN + cleanPath, opts);
     if (res.status === 401) { 
       doLogout(); 
       return null; 
