@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Safety & Surveillance Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Tokens & Design System ─────────────────────────── */
+  :root {
+    --bg:          #0A0D14;
+    --surface:     #121620;
+    --surface-alt: #181E2C;
+    --border:      #222A3C;
+    --border-glow: #00E69940;
+    --accent:      #00E699;
+    --accent-dark: #00B377;
+    --accent-soft: rgba(0, 230, 153, 0.12);
+    --danger:      #FF4D4D;
+    --danger-soft: rgba(255, 77, 77, 0.12);
+    --warning:     #FFB800;
+    --warning-soft:rgba(255, 184, 0, 0.12);
+    --info:        #38BDF8;
+    --info-soft:   rgba(56, 189, 248, 0.12);
+    --text:        #F1F5F9;
+    --muted:       #8A99AD;
+    --radius-sm:   6px;
+    --radius:      10px;
+    --radius-lg:   16px;
+    --font:        'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono:   'JetBrains Mono', monospace;
+    --shadow:      0 8px 32px rgba(0,0,0,0.36);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { 
+    background: var(--bg); 
+    color: var(--text); 
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Login Screen ──────────────────────────────────── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 20%, #162C24 0%, #0A0D14 65%);
+    padding: 20px;
+  }
+  .login-box {
+    background: var(--surface); 
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg); 
+    padding: 40px; 
+    width: 100%; 
+    max-width: 440px;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .login-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .login-logo {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 28px;
+  }
+  .login-logo .dot {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #008055);
+    display: flex; align-items: center; justify-content: center; 
+    font-size: 20px; color: #000;
+    box-shadow: 0 0 20px rgba(0, 230, 153, 0.4);
+  }
+  .login-logo h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .login-logo p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  
+  .demo-creds {
+    background: var(--surface-alt);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 22px;
+    font-size: 12px;
+  }
+  .demo-creds-title {
+    font-weight: 600; color: var(--accent); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .quick-login-btns {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .quick-btn {
+    flex: 1; padding: 6px 8px; font-size: 11px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius-sm); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+  .form-group input {
+    width: 100%; padding: 11px 14px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 14px; outline: none;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn {
+    width: 100%; padding: 12px; background: var(--accent);
+    color: #000; border: none; border-radius: var(--radius);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; box-shadow: 0 4px 14px rgba(0, 230, 153, 0.25);
+  }
+  .btn:hover { background: var(--accent-dark); transform: translateY(-1px); }
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 14px; text-align: center; font-weight: 500; }
+
+  /* ── App Shell ─────────────────────────────────────── */
+  #app { display: none; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 240px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px 0; display: flex; flex-direction: column; z-index: 50;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sidebar-logo .dot {
+    width: 32px; height: 32px; border-radius: 10px;
+    background: var(--accent); color: #000; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 12px rgba(0, 230, 153, 0.3);
+  }
+  .sidebar-logo span { font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .nav { flex: 1; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--muted); transition: all 0.18s; border: none; background: none; width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--surface-alt); color: var(--text); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border-glow); }
+  .nav-item .icon { font-size: 17px; width: 22px; text-align: center; }
+  
+  .sidebar-footer {
+    padding: 16px 14px; border-top: 1px solid var(--border);
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: var(--radius); background: var(--surface-alt); border: 1px solid var(--border);
+  }
+  .user-avatar {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #000; flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-info .name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-info .role { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+  .logout-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 16px; padding: 4px; border-radius: 4px; transition: color 0.2s;
+  }
+  .logout-btn:hover { color: var(--danger); }
+
+  /* ── Main Layout ───────────────────────────────────── */
+  .main { margin-left: 240px; padding: 36px 40px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { 
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 30px; 
+  }
+  .page-header-left h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .page-header-left p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  
+  .header-actions {
+    display: flex; gap: 10px; align-items: center;
+  }
+  .sim-btn {
+    background: var(--surface-alt); border: 1px solid var(--border);
+    color: var(--accent); padding: 8px 14px; border-radius: var(--radius);
+    font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s;
+  }
+  .sim-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* ── Stat Cards ────────────────────────────────────── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 18px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 22px; position: relative; overflow: hidden;
+  }
+  .stat-card .label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-card .value { font-size: 34px; font-weight: 800; font-family: var(--font-mono); }
+  .stat-card.danger .value  { color: var(--danger); }
+  .stat-card.warning .value { color: var(--warning); }
+  .stat-card.success .value { color: var(--accent); }
+  .stat-card.info .value    { color: var(--info); }
+
+  /* ── Incidents Table ───────────────────────────────── */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow);
+  }
+  .table-header {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .table-header h3 { font-size: 15px; font-weight: 700; }
+  .refresh-btn {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--muted);
+    padding: 7px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 14px 20px; text-align: left; font-size: 11px;
+       color: var(--muted); border-bottom: 1px solid var(--border);
+       font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #0E121B; }
+  td { padding: 15px 20px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-alt); }
+  
+  .badge {
+    display: inline-flex; align-items: center; padding: 4px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge.pending    { background: var(--warning-soft); color: var(--warning); border: 1px solid rgba(255, 184, 0, 0.3); }
+  .badge.confirmed  { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(255, 77, 77, 0.3); }
+  .badge.false_alarm{ background: rgba(138, 153, 173, 0.1); color: var(--muted); }
+  .badge.resolved   { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border-glow); }
+  
+  .badge.critical   { background: var(--danger-soft); color: var(--danger); font-weight: 800; }
+  .badge.high       { background: var(--warning-soft); color: var(--warning); }
+  .badge.medium     { background: var(--info-soft); color: var(--info); }
+  .badge.low        { background: rgba(138, 153, 173, 0.1); color: var(--muted); }
+
+  .action-btn {
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .empty-state {
+    padding: 56px; text-align: center; color: var(--muted); font-size: 14px;
+  }
+
+  /* ── Filter Bar ────────────────────────────────────── */
+  .filter-bar {
+    display: flex; gap: 8px; padding: 12px 20px; background: #0E121B; border-bottom: 1px solid var(--border);
+  }
+  .filter-btn {
+    padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn.active {
+    background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+  }
+
+  /* ── Incident Detail Modal ─────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8); z-index: 100;
+    align-items: center; justify-content: center; backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 32px; width: 100%; max-width: 580px;
+    max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow);
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .modal-header h3 { font-size: 18px; font-weight: 800; }
+  .close-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 22px; line-height: 1; transition: color 0.2s;
+  }
+  .close-btn:hover { color: var(--text); }
+  .detail-row {
+    display: flex; gap: 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.4;
+  }
+  .detail-row .key { color: var(--muted); width: 130px; flex-shrink: 0; font-weight: 600; }
+  .detail-row .val { flex: 1; color: var(--text); }
+  
+  .modal-actions { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-confirm {
+    padding: 10px 18px; background: var(--danger); color: #fff;
+    border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-confirm:hover { background: #E03E3E; }
+  .btn-false {
+    padding: 10px 18px; background: none; color: var(--muted);
+    border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-false:hover { background: var(--surface-alt); color: var(--text); }
+  .btn-alert {
+    padding: 10px 18px; background: var(--warning); color: #000;
+    border: none; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-alert:hover { background: #E6A600; }
+  .btn-resolve {
+    padding: 10px 18px; background: var(--accent); color: #000;
+    border: none; border-radius: var(--radius-sm); font-size: 13px;
+    font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-resolve:hover { background: var(--accent-dark); }
+
+  /* ── Toasts ────────────────────────────────────────── */
+  .toast {
+    position: fixed; bottom: 28px; right: 28px; padding: 14px 22px;
+    border-radius: var(--radius); font-size: 13px; font-weight: 600; z-index: 200;
+    box-shadow: var(--shadow); animation: slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.success { background: var(--accent); color: #000; }
+  .toast.error   { background: var(--danger); color: #fff; }
+  .toast.info    { background: var(--info); color: #000; }
+  @keyframes slideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* ── Live Pulse ────────────────────────────────────── */
+  .live-dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); margin-right: 8px;
+    box-shadow: 0 0 10px var(--accent);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.3); opacity: 0.4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ───────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="dot">🛡️</div>
+      <div>
+        <h1>AI Safety Command Center</h1>
+        <p>Smart Campus & City Surveillance v2.0</p>
+      </div>
+    </div>
+
+    <!-- Quick Fill Helper for Presentation/Evaluators -->
+    <div class="demo-creds">
+      <div class="demo-creds-title">
+        <span>⚡ Evaluation / Demo Quick Login</span>
+      </div>
+      <p style="color:var(--muted)">Click below to auto-fill sample university credentials:</p>
+      <div class="quick-login-btns">
+        <button type="button" class="quick-btn" onclick="fillCreds('admin@aisafety.pk', 'secret')">👑 Admin Login</button>
+        <button type="button" class="quick-btn" onclick="fillCreds('operator@aisafety.pk', 'secret')">👮 Operator Login</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" id="login-email" placeholder="admin@aisafety.pk" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn" onclick="doLogin()">Authenticate & Enter</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── APP MAIN SHELL ─────────────────────────────────── -->
+<div id="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="dot">🛡️</div>
+      <span>AI Safety<br>Surveillance</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPage('dashboard')">
+        <span class="icon">📊</span> Overview
+      </button>
+      <button class="nav-item" onclick="showPage('incidents')">
+        <span class="icon">⚠️</span> Incident Review
+      </button>
+      <button class="nav-item" onclick="showPage('cameras')">
+        <span class="icon">📷</span> Active Cameras
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="user-info">
+          <div class="name" id="user-name">Admin</div>
+          <div class="role" id="user-role">admin</div>
+        </div>
+        <button class="logout-btn" onclick="doLogout()" title="Sign Out">↩</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main">
+
+    <!-- Dashboard Page -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2><span class="live-dot"></span>Real-Time Surveillance Overview</h2>
+          <p>Multi-camera AI detection: Weapons, Child Danger, Violence & Medical Falls</p>
+        </div>
+        <div class="header-actions">
+          <button class="sim-btn" onclick="triggerSimulateIncident()">⚡ Simulate Live Incident</button>
+          <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card danger">
+          <div class="label">Pending Action</div>
+          <div class="value" id="stat-pending">—</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="label">Confirmed Threats</div>
+          <div class="value" id="stat-confirmed">—</div>
+        </div>
+        <div class="stat-card success">
+          <div class="label">Resolved Events</div>
+          <div class="value" id="stat-resolved">—</div>
+        </div>
+        <div class="stat-card info">
+          <div class="label">Total Monitored</div>
+          <div class="value" id="stat-total">—</div>
+        </div>
+      </div>
+
+      <!-- Recent Incidents Table -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Recent Detected Incidents</h3>
+          <span style="font-size:12px;color:var(--muted)">Auto-updating feed</span>
+        </div>
+        <div id="recent-incidents-body"></div>
+      </div>
+    </div>
+
+    <!-- Incidents Page -->
+    <div class="page" id="page-incidents">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Incident Management Log</h2>
+          <p>Verify, dispatch emergency alerts, or archive false alarms</p>
+        </div>
+        <div class="header-actions">
+          <button class="sim-btn" onclick="triggerSimulateIncident()">⚡ Add Demo Incident</button>
+          <button class="refresh-btn" onclick="loadIncidents()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="filterIncidents('all', this)">All</button>
+          <button class="filter-btn" onclick="filterIncidents('pending', this)">Pending</button>
+          <button class="filter-btn" onclick="filterIncidents('confirmed', this)">Confirmed</button>
+          <button class="filter-btn" onclick="filterIncidents('resolved', this)">Resolved</button>
+          <button class="filter-btn" onclick="filterIncidents('false_alarm', this)">False Alarms</button>
+        </div>
+        <div id="incidents-body"></div>
+      </div>
+    </div>
+
+    <!-- Cameras Page -->
+    <div class="page" id="page-cameras">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2>Registered Video Streams</h2>
+          <p>CCTV stream health and AI zone configuration</p>
+        </div>
+        <div class="header-actions">
+          <button class="refresh-btn" onclick="loadCameras()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Active Cameras & Perimeter Fences</h3>
+        </div>
+        <div id="cameras-body"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── INCIDENT DETAIL MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="incident-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Incident Analysis Details</h3>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-content"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+// Dynamic API Endpoint (works on localhost, Render, Railway, Vercel)
+const API = (window.location.protocol.startsWith('http')) 
+  ? window.location.origin 
+  : 'http://127.0.0.1:8000';
+
+let token = localStorage.getItem('token');
+let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+let currentIncident = null;
+let currentIncidentFilter = 'all';
+
+function fillCreds(email, password) {
+  document.getElementById('login-email').value = email;
+  document.getElementById('login-password').value = password;
+}
+
+// ── Auth ──────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+
+  if (!email || !pass) {
+    errEl.textContent = 'Please enter both email and password.';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+
+    token = data.access_token;
+    currentUser = data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    showApp();
+    showToast(`Welcome back, ${currentUser.full_name}!`, 'success');
+  } catch(e) {
+    errEl.textContent = e.message;
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  token = null; 
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-name').textContent = currentUser.full_name;
+  document.getElementById('user-role').textContent = currentUser.role;
+  document.getElementById('user-avatar').textContent = (currentUser.full_name || 'U').charAt(0).toUpperCase();
+  loadDashboard();
+}
+
+// ── Navigation ────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  }
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'incidents') loadIncidents();
+  if (name === 'cameras')   loadCameras();
+}
+
+// ── API helper ────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = {
+    method,
+    headers: { 
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json' 
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API + path, opts);
+    if (res.status === 401) { 
+      doLogout(); 
+      return null; 
+    }
+    return await res.json();
+  } catch(e) {
+    console.error('API Error:', e);
+    showToast('Network error connecting to API', 'error');
+    return null;
+  }
+}
+
+// ── Dashboard ─────────────────────────────────────────
+async function loadDashboard() {
+  const stats = await api('/dashboard/stats');
+  if (stats) {
+    document.getElementById('stat-pending').textContent   = stats.pending_review ?? 0;
+    document.getElementById('stat-confirmed').textContent = stats.confirmed ?? 0;
+    document.getElementById('stat-resolved').textContent  = stats.resolved ?? 0;
+    document.getElementById('stat-total').textContent     = stats.total_incidents ?? 0;
+  }
+
+  const incidents = await api('/incidents?limit=8');
+  if (incidents) {
+    document.getElementById('recent-incidents-body').innerHTML = renderIncidentsTable(incidents);
+  }
+}
+
+// ── Incidents ─────────────────────────────────────────
+async function loadIncidents() {
+  let path = '/incidents?limit=50';
+  if (currentIncidentFilter !== 'all') {
+    path += `&status=${currentIncidentFilter}`;
+  }
+  const incidents = await api(path);
+  if (incidents) {
+    document.getElementById('incidents-body').innerHTML = renderIncidentsTable(incidents);
+  }
+}
+
+function filterIncidents(status, btn) {
+  currentIncidentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadIncidents();
+}
+
+function renderIncidentsTable(incidents) {
+  if (!incidents || incidents.length === 0) {
+    return '<div class="empty-state">No incidents recorded in this view.</div>';
+  }
+
+  const rows = incidents.map(i => `
+    <tr>
+      <td style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">${formatDate(i.created_at)}</td>
+      <td><strong>${(i.incident_type || 'Unknown').replace(/_/g,' ')}</strong></td>
+      <td><span class="badge ${i.severity}">${i.severity}</span></td>
+      <td><span class="badge ${i.status}">${(i.status || 'pending').replace(/_/g,' ')}</span></td>
+      <td>${i.location_description || '—'}</td>
+      <td>
+        <button class="action-btn" onclick="openIncident('${i.id}')">
+          Inspect & Action →
+        </button>
+      </td>
+    </tr>
+  `).join('');
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>Classification</th><th>Threat Level</th>
+          <th>Status</th><th>Detected Zone</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Incident Detail Modal ─────────────────────────────
+async function openIncident(id) {
+  const inc = await api(`/incidents/${id}`);
+  if (!inc) return;
+  currentIncident = inc;
+
+  let personsStr = 'None';
+  if (inc.detected_persons) {
+    if (Array.isArray(inc.detected_persons)) {
+      personsStr = inc.detected_persons.join(', ');
+    } else {
+      personsStr = String(inc.detected_persons);
+    }
+  }
+
+  document.getElementById('modal-content').innerHTML = `
+    <div class="detail-row"><span class="key">Incident Type</span>
+      <span class="val"><strong>${(inc.incident_type || '').replace(/_/g,' ')}</strong></span></div>
+    <div class="detail-row"><span class="key">Threat Severity</span>
+      <span class="val"><span class="badge ${inc.severity}">${inc.severity}</span></span></div>
+    <div class="detail-row"><span class="key">Review Status</span>
+      <span class="val"><span class="badge ${inc.status}">${(inc.status || '').replace(/_/g,' ')}</span></span></div>
+    <div class="detail-row"><span class="key">Timestamp</span>
+      <span class="val">${formatDate(inc.created_at)}</span></div>
+    <div class="detail-row"><span class="key">Camera / Location</span>
+      <span class="val">${inc.location_description || '—'}</span></div>
+    <div class="detail-row"><span class="key">Detected Entities</span>
+      <span class="val">${personsStr}</span></div>
+    <div class="detail-row"><span class="key">Investigator Notes</span>
+      <span class="val">${inc.notes || 'No notes added yet.'}</span></div>
+  `;
+
+  const actions = document.getElementById('modal-actions');
+  if (inc.status === 'pending') {
+    actions.innerHTML = `
+      <button class="btn-confirm" onclick="reviewIncident('confirmed')">
+        ⚠️ Confirm Threat
+      </button>
+      <button class="btn-false" onclick="reviewIncident('false_alarm')">
+        ✕ False Alarm
+      </button>
+    `;
+  } else if (inc.status === 'confirmed') {
+    actions.innerHTML = `
+      <button class="btn-alert" onclick="sendAlert()">
+        🔔 Dispatch Emergency Alert (SMS/Email)
+      </button>
+      <button class="btn-resolve" onclick="reviewIncident('resolved')">
+        ✓ Mark Resolved
+      </button>
+    `;
+  } else {
+    actions.innerHTML = `
+      <span style="color:var(--muted);font-size:13px">
+        This incident has been closed as <strong>${inc.status.replace(/_/g,' ')}</strong>.
+      </span>
+      <button class="btn-false" style="margin-left:auto" onclick="reviewIncident('pending')">Reopen Incident</button>
+    `;
+  }
+
+  document.getElementById('incident-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('incident-modal').classList.remove('open');
+  currentIncident = null;
+}
+
+async function reviewIncident(status) {
+  if (!currentIncident) return;
+  const res = await api(`/incidents/${currentIncident.id}/review`, 'PATCH', { status });
+  if (res) {
+    showToast(`Incident marked as ${status.replace(/_/g,' ')}`, 'success');
+    closeModal();
+    loadDashboard();
+    loadIncidents();
+  }
+}
+
+async function sendAlert() {
+  if (!currentIncident) return;
+  const recipient = prompt('Enter recipient emergency phone or email:', 'admin@aisafety.pk');
+  if (!recipient) return;
+  const res = await api('/alerts/send', 'POST', {
+    incident_id: currentIncident.id,
+    alert_type: 'police',
+    channel: 'email',
+    recipient,
+    message: `[AI ALERT] ${currentIncident.incident_type} confirmed at ${currentIncident.location_description || 'monitored zone'}. Immediate response required.`
+  });
+  if (res) showToast('Emergency alert dispatched successfully!', 'success');
+}
+
+async function triggerSimulateIncident() {
+  const options = ['CHILD_IN_DANGER', 'WEAPON_DETECTED', 'FIGHT_DETECTED', 'PERSON_LYING_DOWN', 'HIT_AND_RUN'];
+  const randomType = options[Math.floor(Math.random() * options.length)];
+  const res = await api(`/demo/simulate-incident?incident_type=${randomType}`, 'POST');
+  if (res) {
+    showToast(`⚡ New ${randomType.replace(/_/g,' ')} detected!`, 'error');
+    loadDashboard();
+    loadIncidents();
+  }
+}
+
+// ── Cameras ───────────────────────────────────────────
+async function loadCameras() {
+  const cameras = await api('/cameras');
+  const body = document.getElementById('cameras-body');
+  if (!cameras || cameras.length === 0) {
+    body.innerHTML = '<div class="empty-state">No cameras currently online.</div>';
+    return;
+  }
+  const rows = cameras.map(c => `
+    <tr>
+      <td><strong>${c.name}</strong></td>
+      <td>${c.location}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">${c.latitude || '31.5204'}°, ${c.longitude || '74.3587'}°</td>
+      <td><span class="badge resolved">● LIVE STREAMING</span></td>
+    </tr>`).join('');
+
+  body.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Camera Label</th><th>Monitored Zone</th>
+        <th>GPS Coordinates</th><th>Stream Status</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Utilities ─────────────────────────────────────────
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { day:'2-digit', month:'short',
+    hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${type === 'error' ? '⚠️' : '✓'}</span> <span>${msg}</span>`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── Init ──────────────────────────────────────────────
+if (token && currentUser) {
+  showApp();
+} else {
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// Auto-refresh stats every 15 seconds if on dashboard
+setInterval(() => {
+  if (token && document.getElementById('page-dashboard').classList.contains('active')) {
+    loadDashboard();
+  }
+}, 15000);
+</script>
+</body>
+</html>
