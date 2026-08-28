@@ -203,12 +203,32 @@ app = FastAPI(
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"[Error] Unhandled error: {exc}")
     traceback.print_exc()
-    return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+    resp = JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "*"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    return resp
+
+# Path normalization & CORS guarantee middleware
+@app.middleware("http")
+async def vercel_path_and_cors_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        resp = JSONResponse(content={"status": "ok"}, status_code=200)
+    else:
+        path = request.scope.get("path", "")
+        if path.startswith("/api/index.py"):
+            request.scope["path"] = path.replace("/api/index.py", "", 1) or "/"
+        resp = await call_next(request)
+    
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    return resp
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
