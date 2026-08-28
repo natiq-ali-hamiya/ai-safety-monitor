@@ -1,0 +1,13 @@
+# Core backend requirements
+-r requirements.txt
+
+# Computer Vision & Deep Learning dependencies for local CCTV camera processing
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=9.5.0
+torch>=2.0.0
+torchvision>=0.15.0
+flask>=2.3.0
+streamlit>=1.25.0
+twilio>=8.5.0

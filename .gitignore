@@ -1,3 +1,35 @@
-venv/ 
-*.pyd 
-*.dll 
+# Environments & secrets
+env
+.env
+.env.*
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.dll
+.vscode/
+
+# Local databases & logs
+*.db
+safety_monitor.db
+safety_data.db
+safety_log.txt
+*.log
+
+# Large local datasets, training runs, and AI model weights
+*.pt
+*.onnx
+*.engine
+train/
+valid/
+test/
+runs/
+incidents/
+recordings/
+person_db/
+data.yaml
+gitignore.txt
+README.dataset.txt
+README.roboflow.txt
+run.ps1
