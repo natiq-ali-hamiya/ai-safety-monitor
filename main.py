@@ -444,7 +444,6 @@ class EvidenceRecord(BaseModel):
 
 # ── ROUTER ENDPOINTS ──────────────────────────────────────
 
-@router.get("")
 @router.get("/")
 async def root_status():
     return {
