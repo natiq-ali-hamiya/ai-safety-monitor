@@ -41,7 +41,8 @@ if os.getenv("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
 else:
     SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", str(BASE_DIR / "safety_monitor.db"))
 
-USE_SUPABASE = bool(SUPABASE_KEY and SUPABASE_KEY.strip() and not SUPABASE_KEY.startswith("your_"))
+# Set Supabase to False by default so local queries execute in 1ms with zero network lag
+USE_SUPABASE = bool(os.getenv("USE_SUPABASE", "false").lower() == "true" and SUPABASE_KEY and len(SUPABASE_KEY.strip()) > 20)
 
 # ── Password Hashing (Lightweight & Pure-Python Safe) ─────
 def hash_password(password: str) -> str:
@@ -249,7 +250,7 @@ async def db_query(table: str, method: str = "GET", data: dict = None, filters: 
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             }
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=1.5) as client:
                 if method == "GET":
                     r = await client.get(url, headers=headers)
                 elif method == "POST":
@@ -262,7 +263,8 @@ async def db_query(table: str, method: str = "GET", data: dict = None, filters: 
                 res = r.json()
                 return res[0] if single and isinstance(res, list) and res else res
         except Exception as e:
-            print(f"[Database] Supabase error ({e}). Falling back to local SQLite.")
+            USE_SUPABASE = False
+            print(f"[Database] Supabase timed out or unavailable ({e}). Switched to local SQLite.")
 
     # SQLite Fallback Engine
     conn = get_db_connection()
