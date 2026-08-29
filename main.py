@@ -59,7 +59,10 @@ _db_initialized = False
 
 def get_db_connection():
     global _db_initialized
-    conn = sqlite3.connect(SQLITE_DB_PATH, check_same_thread=False, timeout=10.0)
+    db_path = Path(SQLITE_DB_PATH)
+    if not db_path.parent.exists():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=10.0)
     conn.row_factory = sqlite3.Row
     if not _db_initialized:
         init_sqlite_db(conn)
@@ -146,22 +149,28 @@ def init_sqlite_db(conn):
     conn.commit()
 
     # Seed Default Admin & Sample Data if empty
-    cursor.execute("SELECT COUNT(*) FROM users")
+    pw_hash = hash_password("secret")
+    now = datetime.utcnow().isoformat()
+
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", ("admin@aisafety.pk",))
     if cursor.fetchone()[0] == 0:
         admin_id = str(uuid.uuid4())
-        pw_hash = hash_password("secret")
-        now = datetime.utcnow().isoformat()
-        
         cursor.execute("""
         INSERT INTO users (id, full_name, email, password_hash, role, is_active, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (admin_id, "System Admin", "admin@aisafety.pk", pw_hash, "admin", 1, now))
 
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", ("operator@aisafety.pk",))
+    if cursor.fetchone()[0] == 0:
         operator_id = str(uuid.uuid4())
         cursor.execute("""
         INSERT INTO users (id, full_name, email, password_hash, role, is_active, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (operator_id, "Chief Operator", "operator@aisafety.pk", pw_hash, "operator", 1, now))
+
+    cursor.execute("SELECT COUNT(*) FROM cameras")
+    if cursor.fetchone()[0] == 0:
+        admin_id = str(uuid.uuid4())
 
         # Seed Sample Cameras
         cam1_id = str(uuid.uuid4())
