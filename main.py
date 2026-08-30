@@ -38,7 +38,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 import traceback
 
-load_dotenv()
+load_dotenv()          # tries .env in working directory
+load_dotenv("env")     # also try 'env' (the local filename used in this project)
 
 # ── Environment & Config ───────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
