@@ -33,3 +33,6 @@ gitignore.txt
 README.dataset.txt
 README.roboflow.txt
 run.ps1
+
+# Local-only admin scripts (contain no secrets but aren't needed in deployment)
+seed_supabase.py
