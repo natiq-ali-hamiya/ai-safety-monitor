@@ -222,14 +222,21 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Path normalization & CORS guarantee middleware
 @app.middleware("http")
 async def vercel_path_and_cors_middleware(request: Request, call_next):
+    # Handle OPTIONS preflight immediately — always return 200
     if request.method == "OPTIONS":
         resp = JSONResponse(content={"status": "ok"}, status_code=200)
-    else:
-        path = request.scope.get("path", "")
-        if path.startswith("/api/index.py"):
-            request.scope["path"] = path.replace("/api/index.py", "", 1) or "/"
-        resp = await call_next(request)
-    
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        resp.headers["Access-Control-Max-Age"] = "86400"
+        return resp
+
+    # Strip /api/index.py prefix if Vercel injects it into the path
+    path = request.scope.get("path", "")
+    if path.startswith("/api/index.py"):
+        request.scope["path"] = path.replace("/api/index.py", "", 1) or "/"
+
+    resp = await call_next(request)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "*"
@@ -696,7 +703,11 @@ app.include_router(router, prefix="/api")
 @app.get("/app", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
 async def serve_frontend_app():
-    html_file = BASE_DIR / "index.html"
+    # public/ is the Vercel static root; try it first
+    html_file = BASE_DIR / "public" / "index.html"
+    if not html_file.exists():
+        html_file = BASE_DIR / "index.html"
     if html_file.exists():
         return HTMLResponse(content=html_file.read_text(encoding="utf-8"), status_code=200)
     return HTMLResponse("<h1>AI Safety Monitoring System</h1>")
+
